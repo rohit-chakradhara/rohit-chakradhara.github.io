@@ -957,14 +957,57 @@
                   </div>
                   <div class="socials">
                     <ul>
-
                       <li><a href="https://www.linkedin.com/in/rohit-chakradhara/" target="_blank"><span class="ico-circle"><i class="ion-social-linkedin"></i></span></a></li>
 			      <li><a href="https://github.com/rohit-chakradhara/" target="_blank"><span class="ico-circle"><i class="ion-social-github"></i></span></a></li>
                       <li><a href="./docs/Rohit Chakradhara Resume.pdf" target="_blank"><span class="ico-circle"><ion-icon name="document-text-outline"></ion-icon></span></a></li>
-				
-                      <!-- <li><a href="./docs/Pradyumn Pottapatri Resume.pdf" target="_blank"><span class="ico-circle"><i class="ion-md-document"></i></span></a></li> -->
                     </ul>
                   </div>
+
+                  <!-- Upload form start -->
+                  <div class="pt-4">
+                    <h6 class="title-left">Upload a file (e.g. resume)</h6>
+                    <form id="uploadForm" enctype="multipart/form-data" onsubmit="return false;">
+                      <div class="form-group">
+                        <!-- accept attribute restricts picker; still validate server-side -->
+                        <input type="file" id="fileInput" name="file" class="form-control"
+                          accept=".pdf,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+                      </div>
+                      <div class="form-group">
+                        <input type="text" id="uploaderName" name="name" class="form-control" placeholder="Your name (optional)" />
+                      </div>
+                      <div class="form-group">
+                        <button id="uploadBtn" class="btn btn-primary">Upload</button>
+                      </div>
+                      <div id="uploadStatus" style="margin-top:10px; display:none;">
+                        <div id="progressWrap" style="display:none;">
+                          <div class="progress">
+                            <div id="uploadProgress" class="progress-bar" role="progressbar" style="width:0%"></div>
+                          </div>
+                        </div>
+                        <div id="uploadMessage" style="margin-top:8px;"></div>
+                      </div>
+                    </form>
+                    <small class="text-muted">Tip: server-side endpoint must be available to accept uploads. See upload-server.js in project root.</small>
+
+                    <!-- Deployment & remote upload note -->
+                    <div class="mt-3 p-2" style="background:#f8f9fa;border:1px solid #e9ecef;border-radius:4px;">
+                      <strong>Remote uploads:</strong>
++                      <div style="margin-top:6px;">
++                        Default client limits: max file size 10 MB, allowed types: PDF, DOC, DOCX, TXT.
++                        These are client-side checks only — always enforce on the server too.
++                      </div>
+                      <ul style="margin:6px 0 0 18px;padding:0;">
+                        <li style="margin-bottom:6px;">Either run the upload server locally (node upload-server.js) or deploy it to a host (Render, Railway, Heroku, Fly.io, etc.).</li>
+                        <li style="margin-bottom:6px;">When deployed, set the uploaded endpoint URL (HTTPS) in the site by adding a small script on your hosted page like:
+                          <pre style="background:#fff;padding:6px;border-radius:3px;margin-top:6px;">&lt;script&gt;window.UPLOAD_URL = 'https://your-deployed-host.com/upload';&lt;/script&gt;</pre>
+                        </li>
+                        <li style="margin-bottom:6px;">Important: ensure CORS is enabled server-side and use HTTPS for production.</li>
+                      </ul>
+                      <small class="text-muted">Example deployment commands: git push to Render/Railway or use Heroku CLI (heroku create && git push heroku main). Start command should be: <code>node upload-server.js</code>.</small>
+                    </div>
+                  </div>
+                  <!-- Upload form end -->
+
                 </div>
               </div>
 
@@ -1015,6 +1058,114 @@
   <!-- Template Main Javascript File -->
   <script src="js/main.js"></script>
   <script src="https://unpkg.com/ionicons@5.0.0/dist/ionicons.js"></script>
+
+  <!-- Upload handling script (client-side) -->
+  <script>
+    (function(){
+      // Use global overrides if provided by the hosted page
+      const UPLOAD_URL = (window.UPLOAD_URL && window.UPLOAD_URL.trim()) ? window.UPLOAD_URL : 'http://localhost:3000/upload';
+
++      // Configurable defaults
++      const MAX_UPLOAD_SIZE = (typeof window.MAX_UPLOAD_SIZE === 'number') ? window.MAX_UPLOAD_SIZE : 10 * 1024 * 1024; // 10MB
++      // allowed MIME types and extensions
++      const ALLOWED_UPLOAD_TYPES = Array.isArray(window.ALLOWED_UPLOAD_TYPES) ? window.ALLOWED_UPLOAD_TYPES : [
++        'application/pdf',
++        'application/msword',
++        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
++        'text/plain'
++      ];
++      const ALLOWED_EXT = ['.pdf','.doc','.docx','.txt'];
+
+      const fileInput = document.getElementById('fileInput');
+      const uploadBtn = document.getElementById('uploadBtn');
+      const uploadStatus = document.getElementById('uploadStatus');
+      const uploadMessage = document.getElementById('uploadMessage');
+      const uploadProgress = document.getElementById('uploadProgress');
+      const progressWrap = document.getElementById('progressWrap');
+      const nameInput = document.getElementById('uploaderName');
+
+      function resetUI() {
+        uploadStatus.style.display = 'none';
+        progressWrap.style.display = 'none';
+        uploadProgress.style.width = '0%';
+        uploadProgress.textContent = '';
+        uploadMessage.textContent = '';
+      }
+
+      function hasValidExtension(name){
+        const lower = name.toLowerCase();
+        return ALLOWED_EXT.some(ext => lower.endsWith(ext));
+      }
+
+      uploadBtn.addEventListener('click', function(){
+        resetUI();
+        const file = fileInput.files[0];
+        if(!file){
+          uploadStatus.style.display = 'block';
+          uploadMessage.style.color = 'red';
+          uploadMessage.textContent = 'Please select a file to upload.';
+          return;
+        }
+        // client-side validation: size
+        if(file.size > MAX_UPLOAD_SIZE){
+          uploadStatus.style.display = 'block';
+          uploadMessage.style.color = 'red';
+          uploadMessage.textContent = 'File too large. Max ' + (MAX_UPLOAD_SIZE/1024/1024) + ' MB.';
+          return;
+        }
+        // client-side validation: MIME type and extension (MIME may be unreliable, check both)
+        if(!ALLOWED_UPLOAD_TYPES.includes(file.type) && !hasValidExtension(file.name)){
+          uploadStatus.style.display = 'block';
+          uploadMessage.style.color = 'red';
+          uploadMessage.textContent = 'Invalid file type. Allowed types: PDF, DOC, DOCX, TXT.';
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('name', nameInput.value || '');
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', UPLOAD_URL, true);
+
+        xhr.upload.onprogress = function(e){
+          if(e.lengthComputable){
+            const percent = Math.round((e.loaded / e.total) * 100);
+            uploadStatus.style.display = 'block';
+            progressWrap.style.display = 'block';
+            uploadProgress.style.width = percent + '%';
+            uploadProgress.textContent = percent + '%';
+          }
+        };
+        xhr.onload = function(){
+          uploadStatus.style.display = 'block';
+          if(xhr.status >= 200 && xhr.status < 300){
+            uploadMessage.style.color = 'green';
+            try {
+              const res = JSON.parse(xhr.responseText);
+              uploadMessage.textContent = res.message || 'Upload successful.';
+            } catch (err) {
+              uploadMessage.textContent = 'Upload successful.';
+            }
+          } else {
+            uploadMessage.style.color = 'red';
+            try {
+              const res = JSON.parse(xhr.responseText);
+              uploadMessage.textContent = res.error || ('Upload failed (' + xhr.status + ').');
+            } catch (err) {
+              uploadMessage.textContent = 'Upload failed (' + xhr.status + ').';
+            }
+          }
+        };
+        xhr.onerror = function(){
+          uploadStatus.style.display = 'block';
+          uploadMessage.style.color = 'red';
+          uploadMessage.innerHTML = 'Upload error. Check server, CORS and network. <br/>Configured endpoint: ' + UPLOAD_URL;
+        };
+        xhr.send(formData);
+      });
+    })();
+  </script>
 
 </body>
 </html>
